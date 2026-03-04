@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Transit Trust</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+
+<div class="app-layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon">&#128652;</div>
+      <div>
+        <div class="brand-text">Transit Trust</div>
+        <div class="brand-sub">PUBLIC TRANSPORT SYSTEM</div>
+      </div>
+    </div>
+
+    <nav class="nav-menu">
+      <button class="nav-item nav-active" data-nav="fare" onclick="App.navigate('fare')">
+        <span class="nav-icon">&#129458;</span> Fare Calculator
+      </button>
+      <button class="nav-item" data-nav="rating" onclick="App.navigate('rating')">
+        <span class="nav-icon">&#11088;</span> Rate Service
+      </button>
+      <button class="nav-item" data-nav="dashboard" onclick="App.navigate('dashboard')">
+        <span class="nav-icon">&#128202;</span> Dashboard
+      </button>
+      <button class="nav-item" data-nav="profile" onclick="App.navigate('profile')">
+        <span class="nav-icon">&#128100;</span> My Profile
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div id="sidebar-user">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="avatar-circle">?</div>
+          <div class="text-sm text-slate-500">Loading...</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content-wrap">
+    <div id="main-content">
+      <div class="flex items-center justify-center h-64">
+        <div class="text-slate-600 text-sm">Loading...</div>
+      </div>
+    </div>
+  </main>
+
+</div>
+
+<script src="/static/js/db.js"></script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>
