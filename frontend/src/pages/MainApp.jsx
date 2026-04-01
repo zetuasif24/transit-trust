@@ -3,6 +3,7 @@ import FarePage from "../components/FarePage";
 import RatingPage from "../components/RatingPage";
 import DashboardPage from "../components/DashboardPage";
 import ProfilePage from "../components/ProfilePage";
+import SafetyPage from "../components/SafetyPage";
 
 export default function MainApp({ user, onLogout, onUserUpdate }) {
   const [activePage, setActivePage] = useState("fare");
@@ -10,6 +11,7 @@ export default function MainApp({ user, onLogout, onUserUpdate }) {
   const navItems = [
     { id: "fare",      icon: "🧮", label: "Fare Calculator" },
     { id: "rating",    icon: "⭐", label: "Rate Service"    },
+    { id: "safety",    icon: "⚠️",  label: "Safety Reports"  },
     { id: "dashboard", icon: "📊", label: "Dashboard"       },
     { id: "profile",   icon: "👤", label: "My Profile"      },
   ];
@@ -17,17 +19,14 @@ export default function MainApp({ user, onLogout, onUserUpdate }) {
   const renderPage = () => {
     if (activePage === "fare")      return <FarePage user={user} />;
     if (activePage === "rating")    return <RatingPage user={user} />;
+    if (activePage === "safety")    return <SafetyPage user={user} />;
     if (activePage === "dashboard") return <DashboardPage />;
     if (activePage === "profile")   return <ProfilePage user={user} onUserUpdate={onUserUpdate} />;
   };
 
   return (
     <div className="flex h-screen bg-slate-950 overflow-hidden">
-
-      {/* Sidebar */}
       <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col">
-
-        {/* Brand */}
         <div className="p-6 border-b border-slate-800">
           <div className="flex items-center gap-3">
             <div className="text-3xl">🚌</div>
@@ -37,22 +36,16 @@ export default function MainApp({ user, onLogout, onUserUpdate }) {
             </div>
           </div>
         </div>
-
-        {/* Nav */}
         <nav className="flex-1 p-4 flex flex-col gap-1">
           {navItems.map(item => (
             <button key={item.id} onClick={() => setActivePage(item.id)}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-left w-full
-                ${activePage === item.id
-                  ? "bg-violet-600 text-white"
-                  : "text-slate-400 hover:bg-slate-800 hover:text-white"}`}>
+              className={"flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-left w-full " +
+                (activePage === item.id ? "bg-violet-600 text-white" : "text-slate-400 hover:bg-slate-800 hover:text-white")}>
               <span className="text-lg">{item.icon}</span>
               {item.label}
             </button>
           ))}
         </nav>
-
-        {/* User */}
         <div className="p-4 border-t border-slate-800">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-9 h-9 rounded-full bg-violet-600 flex items-center justify-center text-white font-black">
@@ -69,8 +62,6 @@ export default function MainApp({ user, onLogout, onUserUpdate }) {
           </button>
         </div>
       </aside>
-
-      {/* Main content */}
       <main className="flex-1 overflow-y-auto p-6">
         {renderPage()}
       </main>
