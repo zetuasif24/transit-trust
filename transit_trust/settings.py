@@ -18,6 +18,7 @@ INSTALLED_APPS = [
     "apps.routes",
     "apps.ratings",
     "apps.reports",
+    "apps.safety",
 ]
 
 MIDDLEWARE = [
