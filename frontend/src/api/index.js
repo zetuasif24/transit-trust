@@ -65,6 +65,15 @@ export const RouteAPI = {
     const res = await fetch(API + "/routes/" + routeId + "/buses/");
     return await res.json();
   },
+  getLocations: async () => {
+    const res = await fetch(API + "/routes/locations/");
+    return await res.json();
+  },
+
+  findRoute: async (from, to) => {
+    const res = await fetch(API + "/routes/find/?from=" + encodeURIComponent(from) + "&to=" + encodeURIComponent(to));
+    return await res.json();
+  },
 };
 
 export const RatingAPI = {
