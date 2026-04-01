@@ -3,6 +3,7 @@ import { RouteAPI, ReportAPI } from "../api";
 
 export default function FarePage({ user }) {
   const [locations, setLocations] = useState([]);
+  const [availableTo, setAvailableTo] = useState([]);
   const [buses, setBuses] = useState([]);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -18,7 +19,7 @@ export default function FarePage({ user }) {
     RouteAPI.getLocations().then(setLocations);
   }, []);
 
-  const onFromChange = (val) => {
+  const onFromChange = async (val) => {
     setFrom(val);
     setTo("");
     setRouteInfo(null);
@@ -27,6 +28,13 @@ export default function FarePage({ user }) {
     setResult(null);
     setMsg(null);
     setReportMsg(null);
+    setAvailableTo([]);
+    if (!val) return;
+    const allRoutes = await RouteAPI.getAll();
+    const destinations = allRoutes
+      .filter(r => r.start_point === val || r.end_point === val)
+      .map(r => r.start_point === val ? r.end_point : r.start_point);
+    setAvailableTo(destinations);
   };
 
   const onToChange = async (val) => {
@@ -55,25 +63,20 @@ export default function FarePage({ user }) {
     }
   };
 
-  const checkFare = async () => {
+  const checkFare = () => {
     setMsg(null);
     setResult(null);
     setReportMsg(null);
     if (!from || !to) { setMsg({ type: "error", text: "Please select both From and To locations." }); return; }
     if (!farePaid)    { setMsg({ type: "error", text: "Please enter the fare you paid." }); return; }
     if (!routeInfo)   { setMsg({ type: "error", text: "Please wait for route to load." }); return; }
-
-    const paid  = parseFloat(farePaid);
-    const over  = paid > routeInfo.official_fare;
+    const paid   = parseFloat(farePaid);
+    const over   = paid > routeInfo.official_fare;
     const excess = (paid - routeInfo.official_fare).toFixed(0);
     setResult({ paid, over, excess });
   };
 
   const reportOvercharge = async () => {
-    if (!routeInfo?.found) {
-      setReportMsg({ type: "error", text: "Cannot report overcharge for estimated routes. No registered bus found." });
-      return;
-    }
     if (!selectedBus) {
       setReportMsg({ type: "error", text: "Please select a bus first." });
       return;
@@ -82,8 +85,6 @@ export default function FarePage({ user }) {
     if (res.error) { setReportMsg({ type: "error", text: res.error }); return; }
     setReportMsg({ type: "success", text: "Report submitted. Authorities notified." });
   };
-
-  const filteredTo = locations.filter(l => l !== from);
 
   return (
     <div>
@@ -113,22 +114,25 @@ export default function FarePage({ user }) {
             <select value={to} onChange={e => onToChange(e.target.value)} disabled={!from}
               className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-violet-500 disabled:opacity-40 disabled:cursor-not-allowed">
               <option value="">-- Select destination --</option>
-              {filteredTo.map(l => <option key={l} value={l}>{l}</option>)}
+              {availableTo.map(l => <option key={l} value={l}>{l}</option>)}
             </select>
+            {from && availableTo.length === 0 && (
+              <p className="text-xs text-amber-400 mt-1">No direct routes available from this location.</p>
+            )}
           </div>
 
-          {/* Route info card */}
+          {/* Route info */}
           {loadingRoute && (
             <div className="mb-4 p-3 rounded-xl bg-slate-900 text-slate-400 text-sm">
               Finding route...
             </div>
           )}
           {routeInfo && !loadingRoute && (
-            <div className={`mb-4 p-4 rounded-xl border ${routeInfo.found ? "bg-emerald-900/20 border-emerald-700" : "bg-amber-900/20 border-amber-700"}`}>
+            <div className="mb-4 p-4 rounded-xl border bg-emerald-900/20 border-emerald-700">
               <div className="flex justify-between items-start mb-2">
                 <div className="text-sm font-bold text-white">{routeInfo.name}</div>
-                <span className={`text-xs px-2 py-1 rounded-lg font-bold ${routeInfo.found ? "bg-emerald-900 text-emerald-300" : "bg-amber-900 text-amber-300"}`}>
-                  {routeInfo.found ? "Official Route" : "Estimated"}
+                <span className="text-xs px-2 py-1 rounded-lg font-bold bg-emerald-900 text-emerald-300">
+                  Official Route
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-2 mt-2">
@@ -141,11 +145,6 @@ export default function FarePage({ user }) {
                   <div className="text-sm font-bold text-amber-400">Tk {routeInfo.official_fare}</div>
                 </div>
               </div>
-              {!routeInfo.found && (
-                <p className="text-xs text-amber-400/70 mt-2">
-                  * Estimated at Tk {routeInfo.rate}/km (BRTA rate). Actual fare may vary.
-                </p>
-              )}
             </div>
           )}
 
@@ -234,7 +233,7 @@ export default function FarePage({ user }) {
                     <th className="text-right py-2">Dist</th>
                   </tr>
                 </thead>
-                <tbody id="fare-chart-body">
+                <tbody>
                   <FareChartRows />
                 </tbody>
               </table>
