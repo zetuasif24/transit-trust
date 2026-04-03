@@ -4,7 +4,7 @@ from apps.routes.models import Route
 
 class SafetyReport(models.Model):
     TYPE_CHOICES = [
-        ("safety_issue", "Safety Issue"),
+        ("safety_issue",    "Safety Issue"),
         ("unsafe_location", "Unsafe Location"),
     ]
     STATUS_CHOICES = [
@@ -21,4 +21,28 @@ class SafetyReport(models.Model):
     created_at  = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.report_type} by {self.passenger.full_name} on {self.route.name}"
+        return f"{self.report_type} by {self.passenger.full_name}"
+
+
+class SafetyVote(models.Model):
+    VOTE_CHOICES = [("agree", "Agree"), ("disagree", "Disagree")]
+    passenger = models.ForeignKey(Passenger,    on_delete=models.CASCADE, related_name="safety_votes")
+    report    = models.ForeignKey(SafetyReport, on_delete=models.CASCADE, related_name="votes")
+    vote      = models.CharField(max_length=10, choices=VOTE_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("passenger", "report")
+
+    def __str__(self):
+        return f"{self.passenger.full_name} {self.vote} on report {self.report.id}"
+
+
+class SafetyComment(models.Model):
+    passenger  = models.ForeignKey(Passenger,    on_delete=models.CASCADE, related_name="safety_comments")
+    report     = models.ForeignKey(SafetyReport, on_delete=models.CASCADE, related_name="comments")
+    text       = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Comment by {self.passenger.full_name}"

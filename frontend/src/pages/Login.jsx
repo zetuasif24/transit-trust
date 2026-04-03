@@ -2,10 +2,10 @@ import { useState } from "react";
 import { AuthAPI } from "../api";
 
 export default function Login({ onLogin }) {
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone]       = useState("");
   const [password, setPassword] = useState("");
-  const [msg, setMsg] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [msg, setMsg]           = useState(null);
+  const [loading, setLoading]   = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -15,11 +15,6 @@ export default function Login({ onLogin }) {
     setLoading(false);
     if (res.error) { setMsg({ type: "error", text: res.error }); return; }
     onLogin(res.user);
-  };
-
-  const fillDemo = (type) => {
-    if (type === "passenger") { setPhone("01711000001"); setPassword("demo123"); }
-    else { setPhone("01711000002"); setPassword("admin123"); }
   };
 
   return (
@@ -35,8 +30,13 @@ export default function Login({ onLogin }) {
 
         {/* Tabs */}
         <div className="flex mb-6 bg-slate-900 rounded-xl p-1">
-          <span className="flex-1 text-center py-2 rounded-lg bg-violet-600 text-white text-sm font-semibold">Sign In</span>
-          <a href="/register" className="flex-1 text-center py-2 rounded-lg text-slate-400 text-sm font-semibold hover:text-white transition-colors">Register</a>
+          <span className="flex-1 text-center py-2 rounded-lg bg-violet-600 text-white text-sm font-semibold">
+            Sign In
+          </span>
+          <a href="/register"
+            className="flex-1 text-center py-2 rounded-lg text-slate-400 text-sm font-semibold hover:text-white transition-colors">
+            Register
+          </a>
         </div>
 
         {/* Message */}
@@ -70,24 +70,11 @@ export default function Login({ onLogin }) {
           </button>
         </form>
 
-        {/* Demo buttons */}
-        <div className="mt-6">
-          <p className="text-center text-xs text-slate-600 mb-3">Quick demo logins:</p>
-          <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => fillDemo("passenger")}
-              className="bg-slate-900 hover:bg-slate-700 text-slate-300 text-xs py-3 px-3 rounded-xl transition-colors text-center">
-              👤 Passenger<br/><span className="font-bold">01711000001</span>
-            </button>
-            <button onClick={() => fillDemo("admin")}
-              className="bg-slate-900 hover:bg-slate-700 text-slate-300 text-xs py-3 px-3 rounded-xl transition-colors text-center">
-              🛡 Admin<br/><span className="font-bold">01711000002</span>
-            </button>
-          </div>
-        </div>
-
         <p className="text-center text-xs text-slate-600 mt-6">
           Don't have an account?{" "}
-          <a href="/register" className="text-violet-400 hover:text-violet-300 font-semibold">Register here</a>
+          <a href="/register" className="text-violet-400 hover:text-violet-300 font-semibold">
+            Register here
+          </a>
         </p>
       </div>
     </div>

@@ -6,17 +6,28 @@ import ProfilePage from "../components/ProfilePage";
 import SafetyPage from "../components/SafetyPage";
 
 export default function MainApp({ user, onLogout, onUserUpdate }) {
+  const isAdmin = user.role === "admin";
   const [activePage, setActivePage] = useState("fare");
 
   const navItems = [
     { id: "fare",      icon: "🧮", label: "Fare Calculator" },
     { id: "rating",    icon: "⭐", label: "Rate Service"    },
     { id: "safety",    icon: "⚠️",  label: "Safety Reports"  },
-    { id: "dashboard", icon: "📊", label: "Dashboard"       },
+    ...(isAdmin ? [{ id: "dashboard", icon: "📊", label: "Dashboard" }] : []),
     { id: "profile",   icon: "👤", label: "My Profile"      },
   ];
 
   const renderPage = () => {
+    // Hard block — even if somehow activePage is dashboard for a passenger
+    if (activePage === "dashboard" && !isAdmin) {
+      return (
+        <div className="flex flex-col items-center justify-center h-64">
+          <div className="text-5xl mb-4">🔒</div>
+          <h2 className="text-xl font-black text-white mb-2">Access Denied</h2>
+          <p className="text-slate-400 text-sm">The dashboard is only accessible to admin users.</p>
+        </div>
+      );
+    }
     if (activePage === "fare")      return <FarePage user={user} />;
     if (activePage === "rating")    return <RatingPage user={user} />;
     if (activePage === "safety")    return <SafetyPage user={user} />;
@@ -36,16 +47,20 @@ export default function MainApp({ user, onLogout, onUserUpdate }) {
             </div>
           </div>
         </div>
+
         <nav className="flex-1 p-4 flex flex-col gap-1">
           {navItems.map(item => (
             <button key={item.id} onClick={() => setActivePage(item.id)}
               className={"flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-left w-full " +
-                (activePage === item.id ? "bg-violet-600 text-white" : "text-slate-400 hover:bg-slate-800 hover:text-white")}>
+                (activePage === item.id
+                  ? "bg-violet-600 text-white"
+                  : "text-slate-400 hover:bg-slate-800 hover:text-white")}>
               <span className="text-lg">{item.icon}</span>
               {item.label}
             </button>
           ))}
         </nav>
+
         <div className="p-4 border-t border-slate-800">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-9 h-9 rounded-full bg-violet-600 flex items-center justify-center text-white font-black">
@@ -62,6 +77,7 @@ export default function MainApp({ user, onLogout, onUserUpdate }) {
           </button>
         </div>
       </aside>
+
       <main className="flex-1 overflow-y-auto p-6">
         {renderPage()}
       </main>
