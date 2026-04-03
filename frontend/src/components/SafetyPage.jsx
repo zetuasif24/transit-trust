@@ -1,21 +1,41 @@
 import { useState, useEffect } from "react";
-import { RouteAPI } from "../api";
+import { RouteAPI, formatDate } from "../api";
 
 const API = "http://127.0.0.1:8000/api";
 
 export default function SafetyPage({ user }) {
-  const [routes, setRoutes] = useState([]);
-  const [form, setForm] = useState({ route: "", report_type: "safety_issue", location: "", description: "" });
-  const [msg, setMsg] = useState(null);
+  const [routes, setRoutes]       = useState([]);
+  const [allReports, setAllReports] = useState([]);
   const [myReports, setMyReports] = useState([]);
+  const [form, setForm]           = useState({ route: "", report_type: "safety_issue", location: "", description: "" });
+  const [msg, setMsg]             = useState(null);
+  const [votes, setVotes]         = useState({});
+  const [commentTexts, setCommentTexts] = useState({});
+  const [openComments, setOpenComments] = useState({});
+  const [tab, setTab]             = useState("community");
 
   useEffect(() => {
     RouteAPI.getAll().then(setRoutes);
+    fetchAllReports();
     fetchMyReports();
   }, []);
 
+  const fetchAllReports = async () => {
+    const res  = await fetch(API + "/safety/");
+    const data = await res.json();
+    setAllReports(data);
+    // load my votes for each report
+    data.forEach(async (r) => {
+      const vres  = await fetch(API + "/safety/" + r.id + "/myvote/?passenger_id=" + user.id);
+      const vdata = await vres.json();
+      if (vdata.voted) {
+        setVotes(prev => ({ ...prev, [r.id]: vdata.vote }));
+      }
+    });
+  };
+
   const fetchMyReports = async () => {
-    const res = await fetch(API + "/safety/?passenger_id=" + user.id);
+    const res  = await fetch(API + "/safety/?passenger_id=" + user.id);
     const data = await res.json();
     setMyReports(data);
   };
@@ -28,36 +48,72 @@ export default function SafetyPage({ user }) {
     if (!form.location)    { setMsg({ type: "error", text: "Please enter the location." }); return; }
     if (!form.description) { setMsg({ type: "error", text: "Please describe the issue." }); return; }
 
-    const res = await fetch(API + "/safety/submit/", {
+    const res  = await fetch(API + "/safety/submit/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        passenger:   user.id,
-        route:       form.route,
-        report_type: form.report_type,
-        location:    form.location,
-        description: form.description,
+        passenger: user.id, route: form.route,
+        report_type: form.report_type, location: form.location, description: form.description,
       })
     });
     const data = await res.json();
     if (!res.ok) { setMsg({ type: "error", text: data.error }); return; }
     setMsg({ type: "success", text: "Safety report submitted successfully!" });
     setForm({ route: "", report_type: "safety_issue", location: "", description: "" });
+    fetchAllReports();
     fetchMyReports();
   };
 
-  const typeColors = { safety_issue: "bg-orange-900 text-orange-300", unsafe_location: "bg-red-900 text-red-300" };
-  const typeLabels = { safety_issue: "Safety Issue", unsafe_location: "Unsafe Location" };
+  const handleVote = async (reportId, voteValue) => {
+    if (votes[reportId]) return;
+    const res  = await fetch(API + "/safety/" + reportId + "/vote/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passenger: user.id, vote: voteValue })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setVotes(prev => ({ ...prev, [reportId]: voteValue }));
+      setAllReports(prev => prev.map(r =>
+        r.id === reportId
+          ? { ...r, agree_count: data.agree_count, disagree_count: data.disagree_count }
+          : r
+      ));
+    }
+  };
+
+  const handleComment = async (reportId) => {
+    const text = (commentTexts[reportId] || "").trim();
+    if (!text) return;
+    const res  = await fetch(API + "/safety/" + reportId + "/comment/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passenger: user.id, text })
+    });
+    if (res.ok) {
+      setCommentTexts(prev => ({ ...prev, [reportId]: "" }));
+      fetchAllReports();
+    }
+  };
+
+  const toggleComments = (reportId) => {
+    setOpenComments(prev => ({ ...prev, [reportId]: !prev[reportId] }));
+  };
+
+  const typeColors  = { safety_issue: "bg-orange-900 text-orange-300", unsafe_location: "bg-red-900 text-red-300" };
+  const typeLabels  = { safety_issue: "Safety Issue", unsafe_location: "Unsafe Location" };
   const statusColors = { pending: "bg-slate-700 text-slate-300", reviewed: "bg-blue-900 text-blue-300", resolved: "bg-emerald-900 text-emerald-300" };
 
   return (
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-black text-white">Safety Reports</h1>
-        <p className="text-slate-400 text-sm mt-1">Report safety issues and unsafe locations on bus routes</p>
+        <p className="text-slate-400 text-sm mt-1">Report safety issues, mark unsafe locations and engage with the community</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        {/* Left — Submit form */}
         <div className="bg-slate-800 rounded-2xl p-6">
           <h2 className="text-white font-bold mb-4">Submit a Safety Report</h2>
 
@@ -73,7 +129,9 @@ export default function SafetyPage({ user }) {
               {["safety_issue", "unsafe_location"].map(t => (
                 <button key={t} onClick={() => setForm({ ...form, report_type: t })}
                   className={"py-3 px-4 rounded-xl text-sm font-bold transition-colors border " +
-                    (form.report_type === t ? "bg-violet-600 border-violet-500 text-white" : "bg-slate-900 border-slate-700 text-slate-400 hover:text-white")}>
+                    (form.report_type === t
+                      ? "bg-violet-600 border-violet-500 text-white"
+                      : "bg-slate-900 border-slate-700 text-slate-400 hover:text-white")}>
                   {t === "safety_issue" ? "⚠️ Safety Issue" : "📍 Unsafe Location"}
                 </button>
               ))}
@@ -111,27 +169,151 @@ export default function SafetyPage({ user }) {
           </button>
         </div>
 
-        <div className="bg-slate-800 rounded-2xl p-6">
-          <h2 className="text-white font-bold mb-4">My Safety Reports</h2>
-          <div style={{ maxHeight: "480px", overflowY: "auto" }}>
-            {myReports.length === 0
-              ? <p className="text-slate-500 text-sm">No safety reports yet.</p>
-              : myReports.map(r => (
-                <div key={r.id} className="bg-slate-900 rounded-xl p-4 mb-3">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className={"text-xs px-2 py-1 rounded-lg font-bold " + (typeColors[r.report_type] || "bg-slate-700 text-slate-300")}>
-                      {typeLabels[r.report_type]}
-                    </span>
-                    <span className={"text-xs px-2 py-1 rounded-lg font-bold capitalize " + (statusColors[r.status] || "bg-slate-700 text-slate-300")}>
-                      {r.status}
-                    </span>
-                  </div>
-                  <div className="text-sm font-bold text-slate-200 mt-2">{r.route_detail?.name}</div>
-                  <div className="text-xs text-slate-400 mt-1">📍 {r.location}</div>
-                  <div className="text-xs text-slate-500 mt-2 italic">{r.description}</div>
-                </div>
-              ))}
+        {/* Right — Community feed + My reports */}
+        <div className="flex flex-col gap-4">
+
+          {/* Tabs */}
+          <div className="flex gap-2">
+            <button onClick={() => setTab("community")}
+              className={"flex-1 py-2 rounded-xl text-sm font-bold transition-colors " +
+                (tab === "community" ? "bg-violet-600 text-white" : "bg-slate-800 text-slate-400 hover:text-white")}>
+              🌍 Community Feed ({allReports.length})
+            </button>
+            <button onClick={() => setTab("mine")}
+              className={"flex-1 py-2 rounded-xl text-sm font-bold transition-colors " +
+                (tab === "mine" ? "bg-violet-600 text-white" : "bg-slate-800 text-slate-400 hover:text-white")}>
+              📋 My Reports ({myReports.length})
+            </button>
           </div>
+
+          {/* Community Feed */}
+          {tab === "community" && (
+            <div className="bg-slate-800 rounded-2xl p-4" style={{ maxHeight: "560px", overflowY: "auto" }}>
+              {allReports.length === 0
+                ? <p className="text-slate-500 text-sm">No safety reports yet.</p>
+                : allReports.map(r => (
+                  <div key={r.id} className="bg-slate-900 rounded-xl p-4 mb-3">
+
+                    {/* Header */}
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex gap-2">
+                        <span className={"text-xs px-2 py-1 rounded-lg font-bold " + (typeColors[r.report_type] || "")}>
+                          {typeLabels[r.report_type]}
+                        </span>
+                        <span className={"text-xs px-2 py-1 rounded-lg font-bold capitalize " + (statusColors[r.status] || "")}>
+                          {r.status}
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-600">{formatDate(r.created_at)}</div>
+                    </div>
+
+                    {/* Content */}
+                    <div className="text-sm font-bold text-slate-200">{r.route_detail?.name}</div>
+                    <div className="text-xs text-slate-400 mt-1">📍 {r.location}</div>
+                    <div className="text-xs text-slate-500 mt-1 italic">{r.description}</div>
+                    <div className="text-xs text-slate-600 mt-1">Reported by: {r.passenger_name}</div>
+
+                    {/* Vote buttons */}
+                    <div className="flex gap-3 mt-3">
+                      <button
+                        onClick={() => handleVote(r.id, "agree")}
+                        disabled={!!votes[r.id]}
+                        className={"flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-colors " +
+                          (votes[r.id] === "agree"
+                            ? "bg-emerald-600 text-white"
+                            : votes[r.id]
+                            ? "bg-slate-700 text-slate-500 cursor-not-allowed"
+                            : "bg-slate-700 hover:bg-emerald-900 text-slate-300 hover:text-emerald-300")}>
+                        👍 Agree ({r.agree_count})
+                      </button>
+                      <button
+                        onClick={() => handleVote(r.id, "disagree")}
+                        disabled={!!votes[r.id]}
+                        className={"flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-colors " +
+                          (votes[r.id] === "disagree"
+                            ? "bg-red-600 text-white"
+                            : votes[r.id]
+                            ? "bg-slate-700 text-slate-500 cursor-not-allowed"
+                            : "bg-slate-700 hover:bg-red-900 text-slate-300 hover:text-red-300")}>
+                        👎 Disagree ({r.disagree_count})
+                      </button>
+                      <button
+                        onClick={() => toggleComments(r.id)}
+                        className="ml-auto flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors">
+                        💬 {r.comments?.length || 0}
+                        {openComments[r.id] ? " ▲" : " ▼"}
+                      </button>
+                    </div>
+
+                    {/* Comments section */}
+                    {openComments[r.id] && (
+                      <div className="mt-3 border-t border-slate-700 pt-3">
+                        {/* Existing comments */}
+                        {r.comments && r.comments.length > 0 ? (
+                          <div className="mb-3 flex flex-col gap-2">
+                            {r.comments.map(c => (
+                              <div key={c.id} className="bg-slate-800 rounded-lg p-3">
+                                <div className="flex justify-between items-center mb-1">
+                                  <div className="text-xs font-bold text-violet-400">{c.passenger_name}</div>
+                                  <div className="text-xs text-slate-600">{formatDate(c.created_at)}</div>
+                                </div>
+                                <div className="text-xs text-slate-300">{c.text}</div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-slate-600 mb-3">No comments yet. Be the first!</p>
+                        )}
+
+                        {/* Add comment */}
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={commentTexts[r.id] || ""}
+                            onChange={e => setCommentTexts(prev => ({ ...prev, [r.id]: e.target.value }))}
+                            onKeyDown={e => e.key === "Enter" && handleComment(r.id)}
+                            placeholder="Write a comment..."
+                            className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-violet-500" />
+                          <button
+                            onClick={() => handleComment(r.id)}
+                            className="px-3 py-2 bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold rounded-xl transition-colors">
+                            Post
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+            </div>
+          )}
+
+          {/* My Reports */}
+          {tab === "mine" && (
+            <div className="bg-slate-800 rounded-2xl p-4" style={{ maxHeight: "560px", overflowY: "auto" }}>
+              {myReports.length === 0
+                ? <p className="text-slate-500 text-sm">No safety reports yet.</p>
+                : myReports.map(r => (
+                  <div key={r.id} className="bg-slate-900 rounded-xl p-4 mb-3">
+                    <div className="flex justify-between items-start mb-2">
+                      <span className={"text-xs px-2 py-1 rounded-lg font-bold " + (typeColors[r.report_type] || "")}>
+                        {typeLabels[r.report_type]}
+                      </span>
+                      <span className={"text-xs px-2 py-1 rounded-lg font-bold capitalize " + (statusColors[r.status] || "")}>
+                        {r.status}
+                      </span>
+                    </div>
+                    <div className="text-sm font-bold text-slate-200 mt-2">{r.route_detail?.name}</div>
+                    <div className="text-xs text-slate-400 mt-1">📍 {r.location}</div>
+                    <div className="text-xs text-slate-500 mt-2 italic">{r.description}</div>
+                    <div className="flex gap-3 mt-3 text-xs text-slate-500">
+                      <span>👍 {r.agree_count} agreed</span>
+                      <span>👎 {r.disagree_count} disagreed</span>
+                      <span>💬 {r.comments?.length || 0} comments</span>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
