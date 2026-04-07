@@ -27,7 +27,7 @@ class SafetyReportSerializer(serializers.ModelSerializer):
     class Meta:
         model  = SafetyReport
         fields = ["id", "passenger", "route", "report_type", "location", "description",
-                  "status", "created_at", "route_detail", "passenger_name",
+                  "attachment", "status", "created_at", "route_detail", "passenger_name",
                   "agree_count", "disagree_count", "comments"]
 
 
