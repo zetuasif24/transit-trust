@@ -2,6 +2,7 @@ from django.db import models
 from apps.accounts.models import Passenger
 from apps.routes.models import Route
 
+
 class SafetyReport(models.Model):
     TYPE_CHOICES = [
         ("safety_issue",    "Safety Issue"),
@@ -17,6 +18,7 @@ class SafetyReport(models.Model):
     report_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
     location    = models.CharField(max_length=200)
     description = models.TextField()
+    attachment  = models.TextField(blank=True, default="")  # base64 image
     status      = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending")
     created_at  = models.DateTimeField(auto_now_add=True)
 
@@ -26,16 +28,16 @@ class SafetyReport(models.Model):
 
 class SafetyVote(models.Model):
     VOTE_CHOICES = [("agree", "Agree"), ("disagree", "Disagree")]
-    passenger = models.ForeignKey(Passenger,    on_delete=models.CASCADE, related_name="safety_votes")
-    report    = models.ForeignKey(SafetyReport, on_delete=models.CASCADE, related_name="votes")
-    vote      = models.CharField(max_length=10, choices=VOTE_CHOICES)
+    passenger  = models.ForeignKey(Passenger,    on_delete=models.CASCADE, related_name="safety_votes")
+    report     = models.ForeignKey(SafetyReport, on_delete=models.CASCADE, related_name="votes")
+    vote       = models.CharField(max_length=10, choices=VOTE_CHOICES)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         unique_together = ("passenger", "report")
 
     def __str__(self):
-        return f"{self.passenger.full_name} {self.vote} on report {self.report.id}"
+        return f"{self.passenger.full_name} voted {self.vote}"
 
 
 class SafetyComment(models.Model):
