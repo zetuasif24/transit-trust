@@ -2,7 +2,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from .models import SafetyReport, SafetyVote, SafetyComment
-from .serializers import SafetyReportSerializer, SafetyVoteSerializer, SafetyCommentSerializer
+from .serializers import SafetyReportSerializer, SafetyCommentSerializer
 
 
 @api_view(["GET"])
@@ -51,11 +51,17 @@ def vote(request, report_id):
         report = SafetyReport.objects.get(id=report_id)
     except SafetyReport.DoesNotExist:
         return Response({"error": "Report not found."}, status=404)
-    if SafetyVote.objects.filter(passenger_id=passenger_id, report=report).exists():
-        return Response({"error": "You have already voted on this report."}, status=400)
-    SafetyVote.objects.create(passenger_id=passenger_id, report=report, vote=vote_value)
+
+    existing = SafetyVote.objects.filter(passenger_id=passenger_id, report=report).first()
+    if existing:
+        # Allow changing vote
+        existing.vote = vote_value
+        existing.save()
+    else:
+        SafetyVote.objects.create(passenger_id=passenger_id, report=report, vote=vote_value)
+
     updated = SafetyReportSerializer(report).data
-    return Response({"agree_count": updated["agree_count"], "disagree_count": updated["disagree_count"]})
+    return Response({"agree_count": updated["agree_count"], "disagree_count": updated["disagree_count"], "vote": vote_value})
 
 
 @api_view(["POST"])
