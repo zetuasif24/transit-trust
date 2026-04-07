@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { AuthAPI, RatingAPI, ReportAPI, formatDate, stars } from "../api";
+import { AuthAPI, formatDate, stars } from "../api";
 
 const API = "http://127.0.0.1:8000/api";
 
@@ -8,59 +8,45 @@ export default function DashboardPage() {
   const [ratings, setRatings]     = useState([]);
   const [reports, setReports]     = useState([]);
   const [safety, setSafety]       = useState([]);
-
-  // FR-18 filters
-  const [filterStatus, setFilterStatus]   = useState("");
-  const [filterRoute,  setFilterRoute]    = useState("");
-  const [routes, setRoutes]               = useState([]);
-  const [activeTab, setActiveTab]         = useState("overcharge");
+  const [routes, setRoutes]       = useState([]);
+  const [activeTab, setActiveTab] = useState("overcharge");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterRoute,  setFilterRoute]  = useState("");
 
   useEffect(() => {
     AuthAPI.getStats().then(setStats);
-    RatingAPI.getAll(null).then(data => setRatings(data.slice(0,5)));
+    fetch(API + "/ratings/").then(r => r.json()).then(data => setRatings(data.slice(0, 5)));
+    fetch(API + "/routes/").then(r => r.json()).then(setRoutes);
     fetchReports();
     fetchSafety();
-    fetch("http://127.0.0.1:8000/api/routes/").then(r => r.json()).then(setRoutes);
   }, []);
 
-  const fetchReports = async (status="", route="") => {
-    let url = "http://127.0.0.1:8000/api/reports/";
-    const params = [];
-    if (status) params.push("status=" + status);
-    if (route)  params.push("route_id=" + route);
-    if (params.length) url += "?" + params.join("&");
+  const fetchReports = async (s = "", r = "") => {
+    let url = API + "/reports/";
+    const p = [];
+    if (s) p.push("status=" + s);
+    if (r) p.push("route_id=" + r);
+    if (p.length) url += "?" + p.join("&");
     const res = await fetch(url);
-    const data = await res.json();
-    setReports(data);
+    setReports(await res.json());
   };
 
-  const fetchSafety = async (status="", route="") => {
+  const fetchSafety = async (s = "", r = "") => {
     let url = API + "/safety/";
-    const params = [];
-    if (status) params.push("status=" + status);
-    if (route)  params.push("route_id=" + route);
-    if (params.length) url += "?" + params.join("&");
+    const p = [];
+    if (s) p.push("status=" + s);
+    if (r) p.push("route_id=" + r);
+    if (p.length) url += "?" + p.join("&");
     const res = await fetch(url);
-    const data = await res.json();
-    setSafety(data);
+    setSafety(await res.json());
   };
 
-  const applyFilter = () => {
-    fetchReports(filterStatus, filterRoute);
-    fetchSafety(filterStatus, filterRoute);
-  };
-
-  const clearFilter = () => {
-    setFilterStatus("");
-    setFilterRoute("");
-    fetchReports();
-    fetchSafety();
-  };
+  const applyFilter = () => { fetchReports(filterStatus, filterRoute); fetchSafety(filterStatus, filterRoute); };
+  const clearFilter = () => { setFilterStatus(""); setFilterRoute(""); fetchReports(); fetchSafety(); };
 
   const updateReportStatus = async (id, newStatus) => {
-    await fetch("http://127.0.0.1:8000/api/reports/" + id + "/status/", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+    await fetch(API + "/reports/" + id + "/status/", {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: newStatus })
     });
     fetchReports(filterStatus, filterRoute);
@@ -68,21 +54,73 @@ export default function DashboardPage() {
 
   const updateSafetyStatus = async (id, newStatus) => {
     await fetch(API + "/safety/" + id + "/status/", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: newStatus })
     });
     fetchSafety(filterStatus, filterRoute);
   };
 
-  const heatData = [
-    { route: "Mirpur-10 to Motijheel", risk: 0.85 },
-    { route: "Uttara to Farmgate",     risk: 0.40 },
-    { route: "Gazipur to Gulistan",    risk: 0.70 },
-    { route: "Sadarghat to Mirpur-1",  risk: 0.20 },
-    { route: "Demra to Motijheel",     risk: 0.60 },
-    { route: "Bashundhara to KB",      risk: 0.30 },
-  ];
+  // ── Export CSV ──────────────────────────────────────────────
+  const exportCSV = () => {
+    const type = activeTab === "overcharge" ? "overcharge" : "safety";
+    let url = API + "/reports/export/?type=" + type;
+    if (filterStatus) url += "&status=" + filterStatus;
+    if (filterRoute)  url += "&route_id=" + filterRoute;
+    window.open(url, "_blank");
+  };
+
+  // ── Export PDF ──────────────────────────────────────────────
+  const exportPDF = () => {
+    const data       = activeTab === "overcharge" ? reports : safety;
+    const type       = activeTab === "overcharge" ? "Overcharge" : "Safety";
+    const now        = new Date().toLocaleString("en-BD");
+    const routeName  = routes.find(r => r.id === parseInt(filterRoute))?.name || "All Routes";
+    const statusLabel = filterStatus || "All Statuses";
+
+    let headers = "";
+    let rows    = "";
+
+    if (activeTab === "overcharge") {
+      headers = "<th>ID</th><th>Passenger</th><th>Route</th><th>Bus</th><th>Official Fare</th><th>Charged</th><th>Excess</th><th>Status</th><th>Date</th>";
+      rows = data.map(r =>
+        "<tr><td>" + r.id + "</td><td>" + (r.passenger_name || "") + "</td><td>" +
+        (r.route_detail?.name || "") + "</td><td>" + (r.bus_detail?.license_num || "") +
+        "</td><td>Tk " + r.official_fare + "</td><td>Tk " + r.charged_amount +
+        "</td><td>Tk " + r.excess_amount + "</td><td>" + r.status + "</td><td>" +
+        new Date(r.created_at).toLocaleDateString() + "</td></tr>"
+      ).join("");
+    } else {
+      headers = "<th>ID</th><th>Passenger</th><th>Route</th><th>Type</th><th>Location</th><th>Description</th><th>Agrees</th><th>Disagrees</th><th>Status</th><th>Date</th>";
+      rows = data.map(r =>
+        "<tr><td>" + r.id + "</td><td>" + (r.passenger_name || "") + "</td><td>" +
+        (r.route_detail?.name || "") + "</td><td>" + r.report_type + "</td><td>" +
+        r.location + "</td><td>" + r.description + "</td><td>" + (r.agree_count || 0) +
+        "</td><td>" + (r.disagree_count || 0) + "</td><td>" + r.status + "</td><td>" +
+        new Date(r.created_at).toLocaleDateString() + "</td></tr>"
+      ).join("");
+    }
+
+    const html =
+      "<!DOCTYPE html><html><head><title>Transit Trust - " + type + " Reports</title>" +
+      "<style>body{font-family:Arial,sans-serif;padding:30px;color:#1e293b}" +
+      "h1{color:#4f46e5;margin-bottom:4px}.meta{color:#64748b;font-size:13px;margin-bottom:20px}" +
+      "table{width:100%;border-collapse:collapse;font-size:12px}" +
+      "th{background:#4f46e5;color:white;padding:8px;text-align:left}" +
+      "td{padding:7px 8px;border-bottom:1px solid #e2e8f0}" +
+      "tr:nth-child(even){background:#f8fafc}" +
+      ".footer{margin-top:20px;font-size:11px;color:#94a3b8}</style></head><body>" +
+      "<h1>Transit Trust — " + type + " Reports</h1>" +
+      "<div class='meta'>Generated: " + now + " &nbsp;|&nbsp; Route: " + routeName +
+      " &nbsp;|&nbsp; Status: " + statusLabel + " &nbsp;|&nbsp; Total: " + data.length + " records</div>" +
+      "<table><thead><tr>" + headers + "</tr></thead><tbody>" + rows + "</tbody></table>" +
+      "<div class='footer'>This report was generated by Transit Trust Admin Dashboard.</div>" +
+      "</body></html>";
+
+    const win = window.open("", "_blank");
+    win.document.write(html);
+    win.document.close();
+    win.print();
+  };
 
   const statCards = [
     { label: "Registered Users",   value: stats?.total_users,   icon: "👥", color: "text-violet-400" },
@@ -91,8 +129,13 @@ export default function DashboardPage() {
     { label: "Avg Rating", value: stats?.avg_rating !== "N/A" ? stats?.avg_rating + " / 5" : "N/A", icon: "📈", color: "text-emerald-400" },
   ];
 
-  const badgeColors = ["","bg-red-900 text-red-300","bg-orange-900 text-orange-300","bg-amber-900 text-amber-300","bg-lime-900 text-lime-300","bg-emerald-900 text-emerald-300"];
+  const badgeColors  = ["","bg-red-900 text-red-300","bg-orange-900 text-orange-300","bg-amber-900 text-amber-300","bg-lime-900 text-lime-300","bg-emerald-900 text-emerald-300"];
   const statusColors = { pending: "bg-slate-700 text-slate-300", reviewed: "bg-blue-900 text-blue-300", resolved: "bg-emerald-900 text-emerald-300" };
+  const heatData = [
+    { route: "Mirpur-10 to Motijheel", risk: 0.85 }, { route: "Uttara to Farmgate",    risk: 0.40 },
+    { route: "Gazipur to Gulistan",    risk: 0.70 }, { route: "Sadarghat to Mirpur-1", risk: 0.20 },
+    { route: "Demra to Motijheel",     risk: 0.60 }, { route: "Bashundhara to KB",     risk: 0.30 },
+  ];
 
   return (
     <div>
@@ -116,8 +159,7 @@ export default function DashboardPage() {
       <div className="bg-slate-800 rounded-2xl p-6 mb-6">
         <h2 className="text-white font-bold mb-4">Recent Service Ratings</h2>
         <div style={{ maxHeight: "200px", overflowY: "auto" }}>
-          {ratings.length === 0
-            ? <p className="text-slate-500 text-sm">No ratings yet.</p>
+          {ratings.length === 0 ? <p className="text-slate-500 text-sm">No ratings yet.</p>
             : ratings.map(r => (
               <div key={r.id} className="flex justify-between items-center py-2 border-b border-slate-700">
                 <div>
@@ -132,10 +174,10 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* FR-18 Filter */}
+      {/* Filter + Export */}
       <div className="bg-slate-800 rounded-2xl p-6 mb-6">
-        <h2 className="text-white font-bold mb-4">Filter Reports</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <h2 className="text-white font-bold mb-4">Filter & Export Reports</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div>
             <label className="block text-xs font-bold text-slate-400 mb-2">STATUS</label>
             <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
@@ -154,20 +196,30 @@ export default function DashboardPage() {
               {routes.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
           </div>
-          <div className="flex items-end gap-3">
-            <button onClick={applyFilter}
-              className="flex-1 bg-violet-600 hover:bg-violet-500 text-white font-bold py-3 rounded-xl transition-colors">
-              Apply Filter
+        </div>
+        <div className="flex gap-3 flex-wrap">
+          <button onClick={applyFilter}
+            className="bg-violet-600 hover:bg-violet-500 text-white font-bold px-5 py-2 rounded-xl transition-colors text-sm">
+            Apply Filter
+          </button>
+          <button onClick={clearFilter}
+            className="bg-slate-700 hover:bg-slate-600 text-white font-bold px-5 py-2 rounded-xl transition-colors text-sm">
+            Clear
+          </button>
+          <div className="ml-auto flex gap-3">
+            <button onClick={exportCSV}
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white font-bold px-5 py-2 rounded-xl transition-colors text-sm">
+              📥 Export CSV
             </button>
-            <button onClick={clearFilter}
-              className="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-xl transition-colors">
-              Clear
+            <button onClick={exportPDF}
+              className="flex items-center gap-2 bg-blue-700 hover:bg-blue-600 text-white font-bold px-5 py-2 rounded-xl transition-colors text-sm">
+              🖨️ Export PDF
             </button>
           </div>
         </div>
       </div>
 
-      {/* Reports tabs — FR-16 */}
+      {/* Reports tabs */}
       <div className="bg-slate-800 rounded-2xl p-6 mb-6">
         <div className="flex gap-3 mb-4">
           <button onClick={() => setActiveTab("overcharge")}
@@ -180,10 +232,9 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        <div style={{ maxHeight: "320px", overflowY: "auto" }}>
+        <div style={{ maxHeight: "360px", overflowY: "auto" }}>
           {activeTab === "overcharge" && (
-            reports.length === 0
-              ? <p className="text-slate-500 text-sm">No reports found.</p>
+            reports.length === 0 ? <p className="text-slate-500 text-sm">No reports found.</p>
               : reports.map(r => (
                 <div key={r.id} className="bg-slate-900 rounded-xl p-4 mb-3">
                   <div className="flex justify-between items-start">
@@ -191,6 +242,7 @@ export default function DashboardPage() {
                       <div className="text-sm font-bold text-slate-200">{r.bus_detail?.license_num || "Unknown"}</div>
                       <div className="text-xs text-slate-500">{r.route_detail?.name}</div>
                       <div className="text-xs text-slate-600 mt-1">Paid: Tk {r.charged_amount} — Official: Tk {r.official_fare}</div>
+                      <div className="text-xs text-slate-600">Passenger: {r.passenger_name}</div>
                     </div>
                     <div className="flex flex-col items-end gap-2">
                       <span className="text-xs px-2 py-1 rounded-lg font-bold bg-red-900 text-red-300">+Tk {r.excess_amount}</span>
@@ -206,15 +258,16 @@ export default function DashboardPage() {
               ))
           )}
           {activeTab === "safety" && (
-            safety.length === 0
-              ? <p className="text-slate-500 text-sm">No safety reports found.</p>
+            safety.length === 0 ? <p className="text-slate-500 text-sm">No safety reports found.</p>
               : safety.map(r => (
                 <div key={r.id} className="bg-slate-900 rounded-xl p-4 mb-3">
                   <div className="flex justify-between items-start">
-                    <div>
+                    <div className="flex-1 mr-4">
                       <div className="text-sm font-bold text-slate-200">{r.route_detail?.name}</div>
                       <div className="text-xs text-slate-400 mt-1">📍 {r.location}</div>
                       <div className="text-xs text-slate-500 mt-1 italic">{r.description}</div>
+                      <div className="text-xs text-slate-600">By: {r.passenger_name}</div>
+                      {r.attachment && <img src={r.attachment} alt="" className="mt-2 h-16 rounded-lg object-cover" />}
                     </div>
                     <div className="flex flex-col items-end gap-2">
                       <span className={"text-xs px-2 py-1 rounded-lg font-bold " + (r.report_type === "unsafe_location" ? "bg-red-900 text-red-300" : "bg-orange-900 text-orange-300")}>
@@ -240,10 +293,8 @@ export default function DashboardPage() {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {heatData.map((d, i) => {
             const level = d.risk > 0.65 ? "HIGH RISK" : d.risk > 0.45 ? "MODERATE" : "SAFE";
-            const cls   = d.risk > 0.65
-              ? "bg-red-900/50 border border-red-700 text-red-300"
-              : d.risk > 0.45
-              ? "bg-amber-900/50 border border-amber-700 text-amber-300"
+            const cls   = d.risk > 0.65 ? "bg-red-900/50 border border-red-700 text-red-300"
+              : d.risk > 0.45 ? "bg-amber-900/50 border border-amber-700 text-amber-300"
               : "bg-emerald-900/50 border border-emerald-700 text-emerald-300";
             return (
               <div key={i} className={"rounded-xl p-3 text-center " + cls}>
