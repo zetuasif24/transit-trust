@@ -4,6 +4,7 @@ import RatingPage from "../components/RatingPage";
 import DashboardPage from "../components/DashboardPage";
 import ProfilePage from "../components/ProfilePage";
 import SafetyPage from "../components/SafetyPage";
+import Chatbot from "../components/Chatbot";
 
 export default function MainApp({ user, onLogout, onUserUpdate }) {
   const isAdmin = user.role === "admin";
@@ -18,7 +19,6 @@ export default function MainApp({ user, onLogout, onUserUpdate }) {
   ];
 
   const renderPage = () => {
-    // Hard block — even if somehow activePage is dashboard for a passenger
     if (activePage === "dashboard" && !isAdmin) {
       return (
         <div className="flex flex-col items-center justify-center h-64">
@@ -81,6 +81,8 @@ export default function MainApp({ user, onLogout, onUserUpdate }) {
       <main className="flex-1 overflow-y-auto p-6">
         {renderPage()}
       </main>
+
+      <Chatbot user={user} />
     </div>
   );
 }
