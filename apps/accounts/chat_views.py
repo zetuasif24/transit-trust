@@ -1,3 +1,5 @@
+import os
+from dotenv import load_dotenv
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
@@ -5,7 +7,9 @@ import urllib.request
 import urllib.error
 import json
 
-GROQ_API_KEY = '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'  # Replace with your Groq API key
+load_dotenv()
+
+GROQ_API_KEY = os.getenv('GROQ_API_KEY', '')
 
 SYSTEM_PROMPT = """You are Transit Trust Assistant, a helpful AI for the Transit Trust public transport system in Bangladesh.
 
@@ -25,7 +29,6 @@ def chat(request):
     if not messages:
         return Response({'error': 'No messages provided.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Build messages with system prompt
     groq_messages = [{'role': 'system', 'content': SYSTEM_PROMPT}]
     for m in messages:
         groq_messages.append({'role': m['role'], 'content': m['content']})
@@ -41,10 +44,10 @@ def chat(request):
         'https://api.groq.com/openai/v1/chat/completions',
         data=payload,
         headers={
-    'Content-Type':  'application/json',
-    'Authorization': 'Bearer ' + GROQ_API_KEY,
-    'User-Agent':    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-},
+            'Content-Type':  'application/json',
+            'Authorization': 'Bearer ' + GROQ_API_KEY,
+            'User-Agent':    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
         method='POST'
     )
 
